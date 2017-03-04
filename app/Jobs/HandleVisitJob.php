@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Entities\Visit;
-use Redis;
+use App\Repositories\VisitRepositoryInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
@@ -11,6 +11,13 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Http\Request;
 
+/**
+ * Class HandleVisitJob
+ *
+ * This job registers visit
+ *
+ * @package App\Jobs
+ */
 class HandleVisitJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -36,33 +43,10 @@ class HandleVisitJob implements ShouldQueue
      */
     public function handle()
     {
-        $uri = $this->request->getUri();
+        /** @var VisitRepositoryInterface $repository */
+        $repository = app()->make(VisitRepositoryInterface::class);
 
-        $uniqueIpGlobal = Redis::command('SISMEMBER', ['ips', $this->request->ip()]) === 1;
-        $uniqueCookiesGlobal = Redis::command('SISMEMBER', [
-                'cookies',
-                md5(json_encode($this->request->cookies->all()))
-            ]) === 1;
-
-        $uniqueIp = Redis::command('SISMEMBER', ['ips:' . $uri, $this->request->ip()]) === 1;
-        $uniqueCookies = Redis::command('SISMEMBER', [
-                'cookies:' . $uri,
-                md5(json_encode($this->request->cookies->all()))
-            ]) === 1;
-
-
-        $visitId = Redis::command('INCR', ['next_visit_id']);
-
-        $visit = new Visit($this->request);
-
-        Redis::command('SET', [
-            'visit:1',
-            $visit->toJson()
-        ]);
-
-
-        //$this->request->ip();
-
-        //Redis::command('SADD', ['ips']);
+        // register visit
+        $repository->save(Visit::fromRequest($this->request));
     }
 }
